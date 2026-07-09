@@ -1,8 +1,7 @@
-import uuid
 import datetime
 from typing import Annotated
 
-from pydantic import BaseModel, EmailStr, StringConstraints
+from pydantic import BaseModel, ConfigDict, EmailStr, StringConstraints
 
 password: Annotated[str, StringConstraints(min_length=8, max_length=128)]
 
@@ -14,7 +13,7 @@ class UserRegistration(BaseModel):
 
 
 class GetUserByID(BaseModel):
-    id: uuid.UUID | str
+    id: int
 
 
 class GetUserByEmail(BaseModel):
@@ -35,3 +34,5 @@ class UserReturnData(GetUserByID, GetUserByEmail):
     is_superuser: bool
     created_at: datetime.datetime
     updated_at: datetime.datetime
+
+    model_config = ConfigDict(from_attributes=True)

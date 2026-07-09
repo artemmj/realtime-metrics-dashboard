@@ -14,4 +14,8 @@ RUN uv sync --frozen
 
 RUN chmod +x ./start.sh
 EXPOSE 8080
+
+# RUN useradd -m -u 1000 celery_user && chown -R celery_user:celery_user /app
+# USER celery_user
+
 CMD ["./start.sh"]

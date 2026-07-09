@@ -1,15 +1,18 @@
-from fastapi import APIRouter
+from typing import List
 
+from fastapi import APIRouter, Depends
 
-router = APIRouter(
-    prefix="/users",
-    tags=["Users"]
-)
+from src.schemas.user import UserReturnData
+from src.services.user import UserService
+
+router = APIRouter(prefix="/users", tags=["Users"])
 
 
 @router.get("/")
-def get_users() -> list[dict]:
-    return [{"username": "Rick"}, {"username": "Morty"}]
+async def get_users(
+    service: UserService = Depends(UserService),
+) -> List[UserReturnData]:
+    return await service.get_all()
 
 
 @router.get("/me")

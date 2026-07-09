@@ -11,6 +11,9 @@ services:
       - "8080:8080"
     environment:
       POSTGRES_HOST: ${POSTGRES_HOST:-db}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
     networks:
       - backend-nw
 
@@ -28,8 +31,58 @@ services:
     networks:
       - backend-nw
 
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend-nw
+
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: celery_worker
+    restart: unless-stopped
+    command: uv run celery -A src.celery_app worker --loglevel=info --concurrency=4
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+    networks:
+      - backend-nw
+    depends_on:
+      - redis
+
+  celery_beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: celery_beat
+    restart: unless-stopped
+    command: uv run celery -A src.celery_app beat --loglevel=info
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_DB: 0
+    depends_on:
+      - redis
+    networks:
+      - backend-nw
+
 networks:
   backend-nw: {}
 
 volumes:
   postgres_data: {}
+  redis_data: {}
