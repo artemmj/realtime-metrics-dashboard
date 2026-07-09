@@ -81,6 +81,28 @@ services:
     networks:
       - backend-nw
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"  # или 80:80, если используете Nginx
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://app:8080  # URL для запросов к бэкенду
+      # Для Next.js App Router:
+      - NEXT_PUBLIC_APP_URL=http://localhost:8080
+    networks:
+      - backend-nw
+    depends_on:
+      - app
+    # Если используете режим разработки с hot-reload:
+    # volumes:
+    #   - ./frontend:/app
+    #   - /app/node_modules
+
 networks:
   backend-nw: {}
 

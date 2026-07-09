@@ -18,7 +18,7 @@ class UserService:
         self,
         user_manager: UserManager = Depends(UserManager),
         auth_handler: AuthHandler = Depends(AuthHandler),
-        redis: RedisDependency = Depends(RedisDependency)
+        redis: RedisDependency = Depends(RedisDependency),
     ):
         self.user_manager = user_manager
         self.auth_handler = auth_handler
@@ -75,12 +75,14 @@ class UserService:
             token=token, user_id=exist_user.id, session_id=session_id
         )
 
-        response = JSONResponse(content={"message": "Successfully access!"})
-        response.set_cookie(
-            key="Authorization",
-            value=token,
-            httponly=True,
-            max_age=settings.access_token_expire,
+        response = JSONResponse(
+            content={"message": "Successfully access!", "token": token}
         )
+        # response.set_cookie(
+        #     key="Authorization",
+        #     value=token,
+        #     httponly=True,
+        #     max_age=settings.access_token_expire,
+        # )
 
         return response
