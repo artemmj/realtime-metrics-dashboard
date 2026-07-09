@@ -10,7 +10,7 @@ if [ -f "${ENV_FILE}" ]; then
 fi
 
 echo "(start.sh) Running database migrations..."
-if ! uv run -m src.scripts.safe_alembic_upgrade; then
+if ! uv run alembic upgrade head; then
     echo "(start.sh) Migrations failed! Please try again..." >&2
 fi
 
