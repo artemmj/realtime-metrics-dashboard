@@ -1,6 +1,16 @@
+import datetime
+from typing import NamedTuple
+import uuid
+import jwt
+
 from passlib.context import CryptContext
 
 from src.settings import settings
+
+
+class CreateTokenTuple(NamedTuple):
+    encoded_jwt: str
+    session_id: str
 
 
 class AuthHandler:
@@ -9,3 +19,18 @@ class AuthHandler:
 
     async def get_password_hash(self, password: str) -> str:
         return self.pwd_context.hash(password)
+
+    async def verify_password(self, raw_password: str, hashed_password: str) -> bool:
+        return self.pwd_context.verify(raw_password, hashed_password)
+
+    async def create_access_token(self, user_id: int) -> CreateTokenTuple:
+        expire = datetime.datetime.now(datetime.UTC) + datetime.timedelta(
+            seconds=settings.access_token_expire
+        )
+        session_id = str(uuid.uuid4())
+
+        data = {"exp": expire, "session_id": session_id, "user_id": str(user_id)}
+
+        encoded_jwt = jwt.encode(payload=data, key=self.secret, algorithm="HS256")
+
+        return CreateTokenTuple(encoded_jwt=encoded_jwt, session_id=session_id)

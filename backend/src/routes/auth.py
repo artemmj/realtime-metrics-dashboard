@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
 from starlette import status
 
-from src.schemas.user import RegisterUser, UserReturnData
+from src.schemas.user import AuthUser, RegisterUser, UserReturnData
 from src.services.user import UserService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -24,3 +25,10 @@ async def confirm_registration(
 ) -> dict[str, str]:
     await service.confirm_user(token=token)
     return {"message": "Электронная почта подтверждена"}
+
+
+@router.post(path="/login", status_code=status.HTTP_200_OK)
+async def login(
+    user: AuthUser, service: UserService = Depends(UserService)
+) -> JSONResponse:
+    return await service.login_user(user=user)

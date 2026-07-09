@@ -24,8 +24,16 @@ class RegisterUser(GetUserByEmail):
     password: Annotated[str, StringConstraints(min_length=8, max_length=128)]
 
 
+class AuthUser(GetUserByEmail):
+    password: Annotated[str, StringConstraints(min_length=8, max_length=128)]
+
+
 class CreateUser(GetUserByEmail):
     hashed_password: str
+
+
+class GetUserWithIDAndEmail(GetUserByID, CreateUser):
+    pass
 
 
 class UserReturnData(GetUserByID, GetUserByEmail):

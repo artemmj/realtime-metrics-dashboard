@@ -55,6 +55,7 @@ class CelerySettings(BaseSettings, SettingModelConfigDefault):
 
 class Settings(BaseSettings, SettingModelConfigDefault):
     secret_key: SecretStr = Field(default="", alias="SECRET_KEY")
+    access_token_expire: int = Field(default=3600, alias="ACCESS_TOKEN_EXPIRE")
 
     db_settings: DBSettings = DBSettings()
     email_settings: EmailSettings = EmailSettings()

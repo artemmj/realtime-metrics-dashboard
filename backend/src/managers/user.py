@@ -6,13 +6,29 @@ from sqlalchemy.exc import IntegrityError
 
 from src.db_dependency import DBDependency
 from src.models import User
-from src.schemas.user import CreateUser, UserReturnData
+from src.schemas.user import CreateUser, GetUserWithIDAndEmail, UserReturnData
 
 
 class UserManager:
     def __init__(self, db: DBDependency = Depends(DBDependency)) -> None:
         self.db = db
         self.model = User
+
+    async def get_user_by_email(self, email: str) -> GetUserWithIDAndEmail | None:
+        async with self.db.db_session() as session:
+            query = select(
+                self.model.id,
+                self.model.email,
+                self.model.hashed_password,
+            ).where(self.model.email == email)
+
+            result = await session.execute(query)
+            user = result.mappings().first()
+
+            if user:
+                return GetUserWithIDAndEmail(**user)
+
+            return None
 
     async def get_all(self) -> List[UserReturnData]:
         async with self.db.db_session() as session:
