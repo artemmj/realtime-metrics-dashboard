@@ -44,3 +44,7 @@ class UserReturnData(GetUserByID, GetUserByEmail):
     updated_at: datetime.datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class UserVerifySchema(GetUserByID, GetUserByEmail):
+    session_id: int | None = None

@@ -1,8 +1,11 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from starlette import status
 
-from src.schemas.user import AuthUser, RegisterUser, UserReturnData
+from src.auth_dependency import get_current_user
+from src.schemas.user import AuthUser, RegisterUser, UserReturnData, UserVerifySchema
 from src.services.user import UserService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -32,3 +35,18 @@ async def login(
     user: AuthUser, service: UserService = Depends(UserService)
 ) -> JSONResponse:
     return await service.login_user(user=user)
+
+
+@router.get(path="/logout", status_code=status.HTTP_200_OK)
+async def logout(
+    user: Annotated[UserVerifySchema, Depends(get_current_user)],
+    service: UserService = Depends(UserService),
+) -> JSONResponse:
+    return await service.logout_user(user=user)
+
+
+@router.get(path="/me", status_code=status.HTTP_200_OK, response_model=UserVerifySchema)
+async def get_auth_user(
+    user: Annotated[UserVerifySchema, Depends(get_current_user)],
+) -> UserVerifySchema:
+    return user
