@@ -15,4 +15,4 @@ if ! uv run alembic upgrade head; then
 fi
 
 echo "(start.sh) 🚀 Starting FastAPI..."
-exec uv run uvicorn main:app --host 0.0.0.0 --port 8080 --workers 2 --reload
+exec uv run uvicorn main:app --host 0.0.0.0 --port 8080 --workers 4

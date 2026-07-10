@@ -47,4 +47,4 @@ class UserReturnData(GetUserByID, GetUserByEmail):
 
 
 class UserVerifySchema(GetUserByID, GetUserByEmail):
-    session_id: int | None = None
+    session_id: str | None = None

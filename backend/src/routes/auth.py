@@ -43,10 +43,3 @@ async def logout(
     service: UserService = Depends(UserService),
 ) -> JSONResponse:
     return await service.logout_user(user=user)
-
-
-@router.get(path="/me", status_code=status.HTTP_200_OK, response_model=UserVerifySchema)
-async def get_auth_user(
-    user: Annotated[UserVerifySchema, Depends(get_current_user)],
-) -> UserVerifySchema:
-    return user
