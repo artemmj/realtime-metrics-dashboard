@@ -4,8 +4,8 @@ from fastapi import Depends, HTTPException
 from sqlalchemy import insert, update, select
 from sqlalchemy.exc import IntegrityError
 
-from src.redis_dependency import RedisDependency
-from src.db_dependency import DBDependency
+from src.dependencies.redis_dependency import RedisDependency
+from src.dependencies.db_dependency import DBDependency
 from src.models import User
 from src.schemas.user import (
     CreateUser,

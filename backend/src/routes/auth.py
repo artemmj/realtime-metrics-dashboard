@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from starlette import status
 
-from src.auth_dependency import get_current_user
+from src.dependencies.auth_dependency import get_current_user
 from src.schemas.user import AuthUser, RegisterUser, UserReturnData, UserVerifySchema
 from src.services.user import UserService
 

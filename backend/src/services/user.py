@@ -5,7 +5,7 @@ from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 
-from src.redis_dependency import RedisDependency
+from src.dependencies.redis_dependency import RedisDependency
 from src.tasks.send_email import send_confirmation_email
 from src.handlers.auth import AuthHandler
 from src.managers.user import UserManager
