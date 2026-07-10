@@ -1,7 +1,18 @@
+<template>
+    <div id="app">
+        <router-view />
+    </div>
+</template>
+
 <script setup>
-import HelloWorld from './components/HelloWorld.vue'
+// Пока пусто
 </script>
 
-<template>
-  <HelloWorld />
-</template>
+<style>
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background: #f5f5f5;
+}
+</style>
