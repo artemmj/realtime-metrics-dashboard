@@ -26,7 +26,7 @@ class UserManager:
         self.redis = redis
 
     async def get_user_by_email(self, email: str) -> GetUserWithIDAndEmail | None:
-        async with self.db.db_session() as session:
+        async with self.db._session_factory() as session:
             query = select(
                 self.model.id,
                 self.model.email,
@@ -39,7 +39,7 @@ class UserManager:
             return None
 
     async def get_user_by_id(self, user_id: int) -> UserVerifySchema | None:
-        async with self.db.db_session() as session:
+        async with self.db._session_factory() as session:
             query = select(self.model.id, self.model.email).where(
                 self.model.id == user_id
             )
@@ -50,14 +50,14 @@ class UserManager:
             return None
 
     async def get_all(self) -> List[UserReturnData]:
-        async with self.db.db_session() as session:
+        async with self.db._session_factory() as session:
             query = select(self.model)
             result = await session.execute(query)
             users = result.scalars().all()
             return [UserReturnData.model_validate(user) for user in users]
 
     async def create(self, user: CreateUser) -> UserReturnData:
-        async with self.db.db_session() as session:
+        async with self.db._session_factory() as session:
             query = insert(self.model).values(**user.model_dump()).returning(self.model)
 
             try:
@@ -71,7 +71,7 @@ class UserManager:
             return UserReturnData(**user_data.__dict__)
 
     async def confirm(self, email: str) -> None:
-        async with self.db.db_session() as session:
+        async with self.db._session_factory() as session:
             query = (
                 update(self.model)
                 .where(self.model.email == email)

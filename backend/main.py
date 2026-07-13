@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.routes.auth import router as auth_router
 from src.routes.users import router as users_router
+from src.routes.metrics import router as metrics_router
 
 app = FastAPI(
     title="Realtime Metrics Dashboard. Backend",
@@ -15,6 +16,7 @@ app_router = APIRouter()
 
 app_router.include_router(auth_router, prefix="/v1")
 app_router.include_router(users_router, prefix="/v1")
+app_router.include_router(metrics_router, prefix="/v1")
 
 app.include_router(app_router)
 
