@@ -7,7 +7,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-COPY pyproject.toml uv.lock README.md alembic.ini main.py start.sh ./
+COPY pyproject.toml uv.lock alembic.ini main.py start.sh ./
 COPY src/ ./src/
 
 RUN uv sync --frozen
