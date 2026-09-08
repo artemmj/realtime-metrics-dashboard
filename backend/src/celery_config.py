@@ -13,6 +13,6 @@ celery_app.autodiscover_tasks(packages=["src.tasks"])
 celery_app.conf.beat_schedule = {
     "generate-metric-every-2-seconds": {
         "task": "generate_metrics",
-        "schedule": 2.0,
+        "schedule": 1.0,
     },
 }

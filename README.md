@@ -40,7 +40,7 @@ sequenceDiagram
     participant API as FastAPI WebSocket
     participant UI as Vue 3 Dashboard
 
-    loop Every 2 seconds
+    loop Every 1 seconds
         Beat->>Queue: send "generate_metrics" task
     end
 
@@ -54,7 +54,7 @@ sequenceDiagram
 ```
 
 **По шагам:**
-1. **Celery Beat** по расписанию (каждые 2 секунды) отправляет задачу `generate_metrics` в очередь Redis.
+1. **Celery Beat** по расписанию (каждые 1 секунду) отправляет задачу `generate_metrics` в очередь Redis.
 2. **Celery Worker** забирает задачу, генерирует случайную метрику (`cpu_usage`, `memory_usage`, `active_users`, `requests_per_sec`).
 3. Метрика сохраняется в **PostgreSQL** через SQLAlchemy.
 4. После сохранения публикуется сообщение в **Redis Pub/Sub** (канал `metrics:new`).

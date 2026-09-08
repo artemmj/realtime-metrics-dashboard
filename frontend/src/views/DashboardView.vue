@@ -1,7 +1,7 @@
 <template>
     <div class="dashboard">
         <header class="dashboard-header">
-            <h1>Dashboard</h1>
+            <h1>Realtime Metrics Dashboard</h1>
             <div class="user-info" v-if="authStore.user">
                 <span>Welcome, {{ authStore.user.email }}</span>
                 <button @click="handleLogout" class="btn-logout">Logout</button>
@@ -10,19 +10,20 @@
 
         <!-- Статус WebSocket -->
         <div class="ws-status" :class="{ connected: wsConnected }">
-            WebSocket: {{ wsConnected ? 'Connected' : 'Disconnected' }}
+            WebSocket status: {{ wsConnected ? 'Connected' : 'Disconnected' }}
         </div>
 
         <!-- Сводка по последним значениям метрик -->
         <section class="metrics-summary">
             <h2>Current Metrics</h2>
             <div class="metrics-grid">
-                <div v-for="metric in latestMetrics" :key="metric.name" class="metric-card">
+                <div v-for="metric in latestMetrics" :key="metric.name" 
+                      class="metric-card" 
+                      :class="getMetricStatusClass(metric.name, metric.value)">
                     <div class="metric-name">{{ formatMetricName(metric.name) }}</div>
-                    <div class="metric-value" :style="{ color: metric.value }">
+                    <div class="metric-value" :style="{ color: getMetricColor(metric.name, metric.value) }">
                         {{ metric.value }}
                     </div>
-                    <div class="metric-time">{{ formatTime(metric.created_at) }}</div>
                 </div>
                 <div v-if="latestMetrics.length === 0" class="no-data">
                     No metrics data yet. Waiting for data...
@@ -60,15 +61,23 @@
                         <th>ID</th>
                         <th>Name</th>
                         <th>Value</th>
+                        <th>Status</th>
                         <th>Timestamp</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="metric in filteredMetrics" :key="metric.id">
+                        <tr v-for="metric in filteredMetrics" :key="metric.id"
+                            :class="getMetricRowClass(metric.name, metric.value)">
                             <td>{{ metric.id }}</td>
                             <td>{{ formatMetricName(metric.name) }}</td>
-                            <td :style="{ color: metric.value }">
+                            <td :style="{ color: getMetricColor(metric.name, metric.value) }">
                                 {{ metric.value }}
+                            </td>
+                            <td>
+                                <span class="status-indicator" 
+                                      :class="getMetricStatusClass(metric.name, metric.value)">
+                                    {{ getMetricStatus(metric.name, metric.value) }}
+                                </span>
                             </td>
                             <td>{{ formatTime(metric.created_at) }}</td>
                         </tr>
@@ -96,6 +105,14 @@ const metrics = ref([])          // полный список с REST API
 const loading = ref(false)       // индикатор загрузки
 const error = ref('')            // ошибки
 const selectedMetricFilter = ref('') // фильтр по имени
+
+// ============ Диапазоны метрик ============
+const metricRanges = {
+    cpu_usage: { min: 10, max: 99 },
+    memory_usage: { min: 70, max: 90 },
+    active_users: { min: 1, max: 1525 },
+    requests_per_sec: { min: 1, max: 5000 }
+}
 
 // Уникальные имена метрик из полного списка
 const metricNames = computed(() => {
@@ -133,9 +150,6 @@ let ws = null
 let reconnectTimeout = null
 
 function connectWebSocket() {
-    // Формируем URL с токеном (или без, зависит от бэкенда)
-    // Предположим, что токен передаётся в query параметре или бэк сам понимает по cookie
-    // По ТЗ пока просто ws://localhost/api/v1/metrics/ws
     const wsUrl = 'ws://localhost/api/v1/metrics/ws'
 
     ws = new WebSocket(wsUrl)
@@ -154,19 +168,15 @@ function connectWebSocket() {
                 return
             }
 
-            // Это метрика — сохраняем в массив
-            // У бэкенда timestamp, а в REST — created_at. Унифицируем:
             const metric = {
-                id: data.id || Date.now(), // если нет id, генерируем временный
+                id: data.id || Date.now(),
                 name: data.name,
                 value: data.value,
                 created_at: data.timestamp || data.created_at || new Date().toISOString()
             }
 
-            // Добавляем в начало массива ws-метрик
             wsMetrics.value.unshift(metric)
 
-            // Ограничим размер массива, чтобы не копить бесконечно
             if (wsMetrics.value.length > 200) {
                 wsMetrics.value = wsMetrics.value.slice(0, 200)
             }
@@ -178,7 +188,6 @@ function connectWebSocket() {
     ws.onclose = () => {
         wsConnected.value = false
         console.log('WebSocket disconnected')
-        // Автопереподключение через 3 секунды
         reconnectTimeout = setTimeout(() => {
             connectWebSocket()
         }, 3000)
@@ -201,11 +210,9 @@ function disconnectWebSocket() {
 }
 
 // ============ Computed: последние значения каждой метрики ============
-// Объединяем REST-метрики и WS-метрики, берём самое свежее по каждому имени
 const latestMetrics = computed(() => {
     const combined = [...metrics.value, ...wsMetrics.value]
 
-    // Группируем по имени
     const grouped = {}
     for (const m of combined) {
         if (!grouped[m.name] || new Date(m.created_at) > new Date(grouped[m.name].created_at)) {
@@ -213,9 +220,74 @@ const latestMetrics = computed(() => {
         }
     }
 
-    // Преобразуем в массив и сортируем по имени
     return Object.values(grouped).sort((a, b) => a.name.localeCompare(b.name))
 })
+
+// ============ Функции для подсветки метрик ============
+function getMetricColor(metricName, value) {
+    const range = metricRanges[metricName]
+    if (!range) return '#3b82f6' // синий по умолчанию
+
+    const { min, max } = range
+    const normalizedValue = (value - min) / (max - min)
+    
+    // Определяем зону: 0-30% - зеленый, 30-70% - желтый, 70-100% - красный
+    if (normalizedValue < 0.3) {
+        return '#10b981' // зеленый
+    } else if (normalizedValue < 0.7) {
+        return '#f59e0b' // желтый
+    } else {
+        return '#ef4444' // красный
+    }
+}
+
+function getMetricStatusClass(metricName, value) {
+    const range = metricRanges[metricName]
+    if (!range) return ''
+
+    const { min, max } = range
+    const normalizedValue = (value - min) / (max - min)
+    
+    if (normalizedValue < 0.3) {
+        return 'status-green'
+    } else if (normalizedValue < 0.7) {
+        return 'status-yellow'
+    } else {
+        return 'status-red'
+    }
+}
+
+function getMetricStatus(metricName, value) {
+    const range = metricRanges[metricName]
+    if (!range) return 'Normal'
+
+    const { min, max } = range
+    const normalizedValue = (value - min) / (max - min)
+    
+    if (normalizedValue < 0.3) {
+        return 'Low'
+    } else if (normalizedValue < 0.7) {
+        return 'Medium'
+    } else {
+        return 'High'
+    }
+}
+
+function getMetricRowClass(metricName, value) {
+    const range = metricRanges[metricName]
+    if (!range) return ''
+
+    const { min, max } = range
+    const normalizedValue = (value - min) / (max - min)
+    
+    if (normalizedValue < 0.3) {
+        return 'row-green'
+    } else if (normalizedValue < 0.7) {
+        return 'row-yellow'
+    } else {
+        return 'row-red'
+    }
+}
 
 // ============ Вспомогательные функции ============
 function formatMetricName(name) {
@@ -260,7 +332,7 @@ onUnmounted(() => {
     align-items: center;
     margin-bottom: 20px;
     padding: 15px 0;
-    border-bottom: 1px solid #e2e8f0;
+    border-bottom: 3px solid #e2e8f0;
 }
 
 .user-info {
@@ -301,6 +373,7 @@ onUnmounted(() => {
 /* Сводка метрик */
 .metrics-summary {
     margin-bottom: 30px;
+    border-top: 3px solid #e2e8f0;
 }
 
 .metrics-grid {
@@ -314,6 +387,23 @@ onUnmounted(() => {
     padding: 20px;
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+}
+
+/* Подсветка карточек */
+.metric-card.status-green {
+    background: #f0fdf4;
+    border-left: 4px solid #10b981;
+}
+
+.metric-card.status-yellow {
+    background: #fefce8;
+    border-left: 4px solid #f59e0b;
+}
+
+.metric-card.status-red {
+    background: #fef2f2;
+    border-left: 4px solid #ef4444;
 }
 
 .metric-name {
@@ -326,12 +416,6 @@ onUnmounted(() => {
 .metric-value {
     font-size: 2em;
     font-weight: bold;
-}
-
-.metric-time {
-    font-size: 0.75em;
-    color: #94a3b8;
-    margin-top: 5px;
 }
 
 /* История */
@@ -401,8 +485,44 @@ td {
     border-bottom: 1px solid #f1f5f9;
 }
 
+/* Подсветка строк в таблице */
+tr.row-green td {
+    background: #f0fdf4;
+}
+
+tr.row-yellow td {
+    background: #fefce8;
+}
+
+tr.row-red td {
+    background: #fef2f2;
+}
+
 tr:hover td {
-    background: #f8fafc;
+    filter: brightness(0.95);
+}
+
+/* Индикаторы статуса */
+.status-indicator {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.85em;
+    font-weight: 500;
+}
+
+.status-indicator.status-green {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.status-indicator.status-yellow {
+    background: #fef9c3;
+    color: #854d0e;
+}
+
+.status-indicator.status-red {
+    background: #fee2e2;
+    color: #991b1b;
 }
 
 /* Нет данных */

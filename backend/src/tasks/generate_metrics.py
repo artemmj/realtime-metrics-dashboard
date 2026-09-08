@@ -18,13 +18,13 @@ def generate_metrics():
     value = None
     match name:
         case "cpu_usage":
-            value = random.randint(20, 40)
+            value = random.randint(10, 99)
         case "memory_usage":
             value = random.randint(70, 90)
         case "active_users":
             value = random.randint(97, 100)
         case "requests_per_sec":
-            value = random.randint(1, 500)
+            value = random.randint(1, 5000)
 
     metric_data = {
         "name": name,
