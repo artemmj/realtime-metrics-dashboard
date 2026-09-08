@@ -1,4 +1,4 @@
-# 📊 Real-Time Metrics Dashboard
+# 📊 Realtime Metrics Dashboard
 
 <img width="1285" height="868" alt="Снимок экрана 2026-09-08 в 11 03 14" src="https://github.com/user-attachments/assets/00488a17-109a-4ad4-97cc-18d972e7c0b0" />
 
