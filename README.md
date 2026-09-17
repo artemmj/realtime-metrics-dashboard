@@ -1,12 +1,10 @@
 # 📊 Real-Time Metrics Dashboard
 
 **Демонстрационное веб-приложение для мониторинга системных метрик в реальном времени.** Состоит из трёх компонентов: **Vue 3 SPA** (фронтенд), **FastAPI** (бэкенд) и **Nginx** (прокси-сервер). Метрики генерируются асинхронно через Celery, сохраняются в PostgreSQL и транслируются клиентам через WebSocket с использованием Redis Pub/Sub.
-=======
 
-![Dashboard Screenshot](https://github.com/user-attachments/assets/00488a17-109a-4ad4-97cc-18d972e7c0b0)
+<img width="1035" height="859" alt="Снимок экрана 2026-09-18 в 00 35 09" src="https://github.com/user-attachments/assets/f86b19f3-3f90-40ad-b405-e69e0526fd76" />
 
 ---
-<<<<<<< HEAD
 
 ## 🚀 Быстрый старт
 
@@ -386,34 +384,7 @@ docker compose logs --tail=50 -f
 
 ---
 
-## 🤝 Вклад в проект
-
-### Установка для разработки
-
-1. Форкните репозиторий
-2. Клонируйте ваш форк
-3. Создайте новую ветку: `git checkout -b feature/your-feature`
-4. Внесите изменения и закоммитьте: `git commit -m 'Add some feature'`
-5. Отправьте в ваш форк: `git push origin feature/your-feature`
-6. Создайте Pull Request
-
-### Стандарты кода
-
-- **Python**: следуйте PEP 8, используйте black для форматирования
-- **JavaScript/Vue**: следуйте стандартам Vue 3
-- **Коммиты**: используйте семантические сообщения коммитов
-- **Документация**: обновляйте README.md при изменении API
-
----
-
 ## 📚 Дополнительные ресурсы
-
-### Документация
-- [FastAPI Documentation](https://fastapi.tiangolo.com/)
-- [Vue 3 Documentation](https://vuejs.org/)
-- [Celery Documentation](https://docs.celeryq.dev/)
-- [PostgreSQL Documentation](https://www.postgresql.org/docs/)
-- [Redis Documentation](https://redis.io/documentation)
 
 ### Мониторинг и отладка
 - **API документация**: http://localhost/api/docs
@@ -459,35 +430,6 @@ docker stats backend-app celery_worker db redis
 # Проверка WebSocket соединений
 docker compose exec redis redis-cli PUBSUB CHANNELS
 ```
-
----
-
-## 📞 Поддержка
-
-### Проблемы и баги
-Если вы обнаружили ошибку, пожалуйста, создайте issue в репозитории с детальным описанием:
-1. Что вы ожидали получить
-2. Что произошло на самом деле
-3. Шаги для воспроизведения проблемы
-4. Версии ПО и окружения
-
-### Вопросы и обсуждения
-Для общих вопросов и обсуждений используйте раздел Discussions репозитория.
-
----
-
-## 📄 Лицензия
-
-Этот проект распространяется под лицензией MIT. Подробности см. в файле LICENSE.
-
----
-
-## 🙏 Благодарности
-
-- [FastAPI](https://fastapi.tiangolo.com/) за отличный фреймворк
-- [Vue.js](https://vuejs.org/) за прекрасный фронтенд фреймворк
-- [Celery](https://docs.celeryq.dev/) за асинхронную обработку задач
-- Сообщество Open Source за все инструменты и библиотеки
 
 ---
 
