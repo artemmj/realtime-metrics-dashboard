@@ -9,23 +9,43 @@
         </header>
 
         <!-- Статус WebSocket -->
-        <div class="ws-status" :class="{ connected: wsConnected }">
-            WebSocket status: {{ wsConnected ? 'Connected' : 'Disconnected' }}
+        <div class="ws-status" :class="{ connected: stream.state.connected }">
+            <span class="ws-dot"></span>
+            {{ stream.state.connected ? 'Live' : 'Disconnected' }}
         </div>
+
+        <!-- Realtime: график + живая лента событий -->
+        <section class="live-grid">
+            <div class="panel chart-panel">
+                <div class="panel-title-row">
+                    <h2>Realtime</h2>
+                    <span class="panel-hint">last 60 points</span>
+                </div>
+                <div class="chart-container">
+                    <LiveChart :definitions="stream.state.definitions" :series="stream.state.series" />
+                </div>
+            </div>
+
+            <div class="panel feed-panel">
+                <div class="panel-title-row">
+                    <h2>Live events</h2>
+                </div>
+                <EventFeed :events="stream.state.events" />
+            </div>
+        </section>
 
         <!-- Сводка по последним значениям метрик -->
         <section class="metrics-summary">
             <h2>Current Metrics</h2>
             <div class="metrics-grid">
-                <div v-for="metric in latestMetrics" :key="metric.name" 
-                      class="metric-card" 
-                      :class="getMetricStatusClass(metric.name, metric.value)">
-                    <div class="metric-name">{{ formatMetricName(metric.name) }}</div>
-                    <div class="metric-value" :style="{ color: getMetricColor(metric.name, metric.value) }">
-                        {{ metric.value }}
-                    </div>
-                </div>
-                <div v-if="latestMetrics.length === 0" class="no-data">
+                <MetricCard
+                    v-for="def in definitionList"
+                    :key="def.name"
+                    :definition="def"
+                    :latest="stream.state.latest[def.name]"
+                    :values="seriesValues(def.name)"
+                />
+                <div v-if="definitionList.length === 0" class="no-data">
                     No metrics data yet. Waiting for data...
                 </div>
             </div>
@@ -47,7 +67,7 @@
                     <select v-model="selectedMetricFilter">
                         <option value="">All metrics</option>
                         <option v-for="name in metricNames" :key="name" :value="name">
-                        {{ formatMetricName(name) }}
+                        {{ displayName(name) }}
                         </option>
                     </select>
                 </label>
@@ -67,16 +87,15 @@
                     </thead>
                     <tbody>
                         <tr v-for="metric in filteredMetrics" :key="metric.id"
-                            :class="getMetricRowClass(metric.name, metric.value)">
+                            :class="rowClass(metric)">
                             <td>{{ metric.id }}</td>
-                            <td>{{ formatMetricName(metric.name) }}</td>
-                            <td :style="{ color: getMetricColor(metric.name, metric.value) }">
-                                {{ metric.value }}
+                            <td>{{ displayName(metric.name) }}</td>
+                            <td :style="{ color: statusColor(metric) }">
+                                {{ formatValue(metric) }}
                             </td>
                             <td>
-                                <span class="status-indicator" 
-                                      :class="getMetricStatusClass(metric.name, metric.value)">
-                                    {{ getMetricStatus(metric.name, metric.value) }}
+                                <span class="status-indicator" :class="metricStatus(metric)">
+                                    {{ statusLabel(metric) }}
                                 </span>
                             </td>
                             <td>{{ formatTime(metric.created_at) }}</td>
@@ -95,6 +114,10 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { useMetricsStream } from '../composables/useMetricsStream'
+import MetricCard from '../components/metrics/MetricCard.vue'
+import LiveChart from '../components/metrics/LiveChart.vue'
+import EventFeed from '../components/metrics/EventFeed.vue'
 import api from '../api'
 
 const authStore = useAuthStore()
@@ -106,13 +129,7 @@ const loading = ref(false)       // индикатор загрузки
 const error = ref('')            // ошибки
 const selectedMetricFilter = ref('') // фильтр по имени
 
-// ============ Диапазоны метрик ============
-const metricRanges = {
-    cpu_usage: { min: 10, max: 99 },
-    memory_usage: { min: 70, max: 90 },
-    active_users: { min: 1, max: 1525 },
-    requests_per_sec: { min: 1, max: 5000 }
-}
+// ============ Диапазоны метрик больше не нужны — они приходят с бэкенда в WS hello ============
 
 // Уникальные имена метрик из полного списка
 const metricNames = computed(() => {
@@ -143,150 +160,45 @@ async function loadMetrics() {
     }
 }
 
-// ============ WebSocket ============
-const wsConnected = ref(false)
-const wsMetrics = ref([]) // метрики, пришедшие по WebSocket
-let ws = null
-let reconnectTimeout = null
+// ============ WebSocket-поток (composable-синглтон) ============
+const stream = useMetricsStream()
 
-function connectWebSocket() {
-    const wsUrl = 'ws://localhost/api/v1/metrics/ws'
+// ============ Определения метрик (прилетают по WS в hello) ============
+const definitionList = computed(() => Object.values(stream.state.definitions))
 
-    ws = new WebSocket(wsUrl)
-
-    ws.onopen = () => {
-        wsConnected.value = true
-        console.log('WebSocket connected')
-    }
-
-    ws.onmessage = (event) => {
-        try {
-            const data = JSON.parse(event.data)
-
-            // Игнорируем ping
-            if (data.type === 'ping') {
-                return
-            }
-
-            const metric = {
-                id: data.id || Date.now(),
-                name: data.name,
-                value: data.value,
-                created_at: data.timestamp || data.created_at || new Date().toISOString()
-            }
-
-            wsMetrics.value.unshift(metric)
-
-            if (wsMetrics.value.length > 200) {
-                wsMetrics.value = wsMetrics.value.slice(0, 200)
-            }
-        } catch (e) {
-            console.warn('Failed to parse WebSocket message:', event.data, e)
-        }
-    }
-
-    ws.onclose = () => {
-        wsConnected.value = false
-        console.log('WebSocket disconnected')
-        reconnectTimeout = setTimeout(() => {
-            connectWebSocket()
-        }, 3000)
-    }
-
-    ws.onerror = (err) => {
-        console.error('WebSocket error:', err)
-    }
+function seriesValues(name) {
+    return (stream.state.series[name] || []).map((p) => p.v)
 }
 
-function disconnectWebSocket() {
-    if (reconnectTimeout) {
-        clearTimeout(reconnectTimeout)
-        reconnectTimeout = null
-    }
-    if (ws) {
-        ws.close()
-        ws = null
-    }
-}
+// ============ Статусы для таблицы (по определениям из WS hello) ============
+const STATUS_COLORS = { normal: '#10b981', warning: '#f59e0b', critical: '#ef4444' }
+const STATUS_LABELS = { normal: 'Normal', warning: 'Warning', critical: 'Critical' }
+const ROW_CLASSES = { normal: 'row-green', warning: 'row-yellow', critical: 'row-red' }
 
-// ============ Computed: последние значения каждой метрики ============
-const latestMetrics = computed(() => {
-    const combined = [...metrics.value, ...wsMetrics.value]
+function metricStatus(metric) {
+    const def = stream.state.definitions[metric.name]
+    if (!def) return 'normal'
 
-    const grouped = {}
-    for (const m of combined) {
-        if (!grouped[m.name] || new Date(m.created_at) > new Date(grouped[m.name].created_at)) {
-            grouped[m.name] = m
-        }
-    }
-
-    return Object.values(grouped).sort((a, b) => a.name.localeCompare(b.name))
-})
-
-// ============ Функции для подсветки метрик ============
-function getMetricColor(metricName, value) {
-    const range = metricRanges[metricName]
-    if (!range) return '#3b82f6' // синий по умолчанию
-
-    const { min, max } = range
-    const normalizedValue = (value - min) / (max - min)
-    
-    // Определяем зону: 0-30% - зеленый, 30-70% - желтый, 70-100% - красный
-    if (normalizedValue < 0.3) {
-        return '#10b981' // зеленый
-    } else if (normalizedValue < 0.7) {
-        return '#f59e0b' // желтый
+    if (def.higher_is_bad) {
+        if (def.critical != null && metric.value >= def.critical) return 'critical'
+        if (def.warning != null && metric.value >= def.warning) return 'warning'
     } else {
-        return '#ef4444' // красный
+        if (def.critical != null && metric.value <= def.critical) return 'critical'
+        if (def.warning != null && metric.value <= def.warning) return 'warning'
     }
+    return 'normal'
 }
 
-function getMetricStatusClass(metricName, value) {
-    const range = metricRanges[metricName]
-    if (!range) return ''
-
-    const { min, max } = range
-    const normalizedValue = (value - min) / (max - min)
-    
-    if (normalizedValue < 0.3) {
-        return 'status-green'
-    } else if (normalizedValue < 0.7) {
-        return 'status-yellow'
-    } else {
-        return 'status-red'
-    }
+function statusColor(metric) {
+    return STATUS_COLORS[metricStatus(metric)]
 }
 
-function getMetricStatus(metricName, value) {
-    const range = metricRanges[metricName]
-    if (!range) return 'Normal'
-
-    const { min, max } = range
-    const normalizedValue = (value - min) / (max - min)
-    
-    if (normalizedValue < 0.3) {
-        return 'Low'
-    } else if (normalizedValue < 0.7) {
-        return 'Medium'
-    } else {
-        return 'High'
-    }
+function statusLabel(metric) {
+    return STATUS_LABELS[metricStatus(metric)]
 }
 
-function getMetricRowClass(metricName, value) {
-    const range = metricRanges[metricName]
-    if (!range) return ''
-
-    const { min, max } = range
-    const normalizedValue = (value - min) / (max - min)
-    
-    if (normalizedValue < 0.3) {
-        return 'row-green'
-    } else if (normalizedValue < 0.7) {
-        return 'row-yellow'
-    } else {
-        return 'row-red'
-    }
+function rowClass(metric) {
+    return ROW_CLASSES[metricStatus(metric)]
 }
 
 // ============ Вспомогательные функции ============
@@ -295,6 +207,20 @@ function formatMetricName(name) {
         .split('_')
         .map(word => word.charAt(0).toUpperCase() + word.slice(1))
         .join(' ')
+}
+
+// Имя из определений WS (fallback — форматирование из snake_case)
+function displayName(name) {
+    return stream.state.definitions[name]?.display_name || formatMetricName(name)
+}
+
+// Форматирование значения с точностью из определения метрики
+function formatValue(metric) {
+    const precision = stream.state.definitions[metric.name]?.precision ?? 0
+    return metric.value.toLocaleString('en-US', {
+        minimumFractionDigits: precision,
+        maximumFractionDigits: precision
+    })
 }
 
 function formatTime(isoString) {
@@ -312,11 +238,11 @@ async function handleLogout() {
 // ============ Жизненный цикл ============
 onMounted(() => {
     loadMetrics()
-    connectWebSocket()
+    stream.connect()
 })
 
 onUnmounted(() => {
-    disconnectWebSocket()
+    stream.disconnect()
 })
 </script>
 
@@ -356,18 +282,119 @@ onUnmounted(() => {
 
 /* WebSocket статус */
 .ws-status {
-    padding: 6px 12px;
-    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 999px;
     background: #fee2e2;
     color: #991b1b;
-    display: inline-block;
     margin-bottom: 20px;
     font-size: 0.9em;
+    font-weight: 600;
+}
+
+.ws-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ef4444;
 }
 
 .ws-status.connected {
     background: #dcfce7;
     color: #166534;
+}
+
+.ws-status.connected .ws-dot {
+    background: #10b981;
+    animation: pulse-dot 2s infinite;
+}
+
+@keyframes pulse-dot {
+    0% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
+    }
+    70% {
+        box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+    }
+}
+
+/* Realtime-секция: график + лента событий */
+.live-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 15px;
+    margin-bottom: 30px;
+    align-items: start; /* панели не растягиваются до высоты контента друг друга */
+}
+
+@media (max-width: 900px) {
+    .live-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.panel {
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    padding: 16px 18px;
+}
+
+.panel-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 12px;
+}
+
+.panel h2 {
+    margin: 0;
+    font-size: 1.05em;
+}
+
+.panel-hint {
+    font-size: 0.75em;
+    color: #94a3b8;
+}
+
+.chart-panel {
+    background: #0f172a;
+    border: 1px solid #1e293b;
+}
+
+.chart-panel h2 {
+    color: #e2e8f0;
+}
+
+.chart-panel .panel-hint {
+    color: #64748b;
+}
+
+.chart-container {
+    height: 300px;
+}
+
+.feed-panel {
+    display: flex;
+    flex-direction: column;
+    max-height: 360px; /* ограничиваем рост, скролим внутри */
+    overflow: hidden;
+}
+
+.feed-panel h2 {
+    color: #0f172a;
+}
+
+.feed-panel :deep(.event-feed) {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: 100%;
+    overflow-y: auto;
 }
 
 /* Сводка метрик */
@@ -378,44 +405,8 @@ onUnmounted(() => {
 
 .metrics-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
     gap: 15px;
-}
-
-.metric-card {
-    background: white;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    transition: all 0.3s ease;
-}
-
-/* Подсветка карточек */
-.metric-card.status-green {
-    background: #f0fdf4;
-    border-left: 4px solid #10b981;
-}
-
-.metric-card.status-yellow {
-    background: #fefce8;
-    border-left: 4px solid #f59e0b;
-}
-
-.metric-card.status-red {
-    background: #fef2f2;
-    border-left: 4px solid #ef4444;
-}
-
-.metric-name {
-    font-size: 0.85em;
-    color: #64748b;
-    text-transform: uppercase;
-    margin-bottom: 8px;
-}
-
-.metric-value {
-    font-size: 2em;
-    font-weight: bold;
 }
 
 /* История */
@@ -510,17 +501,17 @@ tr:hover td {
     font-weight: 500;
 }
 
-.status-indicator.status-green {
+.status-indicator.status-normal {
     background: #dcfce7;
     color: #166534;
 }
 
-.status-indicator.status-yellow {
+.status-indicator.status-warning {
     background: #fef9c3;
     color: #854d0e;
 }
 
-.status-indicator.status-red {
+.status-indicator.status-critical {
     background: #fee2e2;
     color: #991b1b;
 }

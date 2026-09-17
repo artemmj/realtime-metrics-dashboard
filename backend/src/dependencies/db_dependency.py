@@ -22,6 +22,11 @@ class DBDependency:
         async with self._session_factory() as session:
             yield session
 
+    @property
+    def session_factory(self) -> async_sessionmaker[AsyncSession]:
+        """Фабрика сессий для использования вне DI (например, в WebSocket-хендлерах)."""
+        return self._session_factory
+
 
 # Синхронный URL для Celery (заменяем postgresql+asyncpg на postgresql+psycopg2)
 SYNC_DATABASE_URL = settings.db_settings.db_url.replace("+asyncpg", "+psycopg2")
